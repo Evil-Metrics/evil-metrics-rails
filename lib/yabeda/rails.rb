@@ -3,6 +3,7 @@
 require "yabeda"
 require "rails"
 require "yabeda/rails/railtie"
+require "yabeda/rails/config"
 
 module Yabeda
   # Minimal set of Rails-specific metrics for using with Yabeda
@@ -25,6 +26,8 @@ module Yabeda
       # rubocop: disable Metrics/MethodLength, Metrics/BlockLength, Metrics/AbcSize
       def install!
         Yabeda.configure do
+          config = Config.new
+
           group :rails
 
           counter   :requests_total,   comment: "A counter of the total number of HTTP requests rails processed.",
@@ -42,6 +45,12 @@ module Yabeda
           histogram :db_runtime, unit: :seconds, buckets: LONG_RUNNING_REQUEST_BUCKETS,
                                  comment: "A histogram of the activerecord execution time.",
                                  tags: %i[controller action status format method]
+
+          if config.apdex_target
+            gauge :apdex_target, unit: :seconds,
+                                 comment: "Tolerable time for Apdex (T value: maximum duration of satisfactory request)"
+            collect { rails_apdex_target.set({}, config.apdex_target) }
+          end
 
           ActiveSupport::Notifications.subscribe "process_action.action_controller" do |*args|
             event = ActiveSupport::Notifications::Event.new(*args)
